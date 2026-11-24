@@ -14,7 +14,7 @@ defineProps<{
 
 <template>
   <div
-    class="a4-sheet doc-serif px-11 py-10 flex flex-col justify-between text-black"
+    class="a4-sheet doc-serif px-11 py-16 flex flex-col justify-between text-black"
     :style="{
       transform: `scale(${zoomLevel})`,
       marginBottom: zoomLevel < 1 ? `${(zoomLevel - 1) * 1123}px` : '0px',

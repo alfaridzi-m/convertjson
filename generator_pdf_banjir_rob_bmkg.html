@@ -259,7 +259,7 @@
               <h2 class="font-bold text-[14px] leading-tight uppercase">INFORMASI POTENSI BANJIR PESISIR (ROB)</h2>
               <div class="font-bold text-[12.5px] leading-tight mt-0.5">Wilayah Indonesia</div>
               <div id="previewDocNo" class="text-[11.5px] leading-tight mt-1 font-medium">No: -</div>
-              <div id="previewValidRange" class="text-[11.5px] leading-tight mt-0.5 font-semibold">Berlaku Tanggal -</div>
+              <div id="previewValidRange" class="text-[11.5px] leading-tight mt-0.5">Berlaku Tanggal -</div>
             </div>
 
             <!-- 3 Stacked Indonesia Map Canvases (H+1, H+2, H+3) -->
@@ -294,7 +294,7 @@
         </div>
 
         <!-- ================= PAGE 2: TABEL WILAYAH + HIMBAUAN + TTD ================= -->
-        <div id="a4Page2" class="a4-sheet doc-serif px-11 py-10 flex flex-col justify-between text-black">
+        <div id="a4Page2" class="a4-sheet doc-serif px-11 py-16 flex flex-col justify-between text-black">
           <div>
             <!-- Tabel Potensi Banjir Pesisir 3 Hari -->
             <div class="bmkg-table-wrap">
@@ -1490,32 +1490,7 @@
         }
       }
 
-      // 5. Top-Left Zoom Button Decoration
-      if (showInfoCard) {
-        ctx.save();
-        drawRoundedRect(ctx, 22, 20, 38, 72, 6);
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(0,0,0,0.22)';
-        ctx.shadowBlur = 6;
-        ctx.fill();
-        ctx.shadowColor = 'transparent';
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(22, 56);
-        ctx.lineTo(60, 56);
-        ctx.stroke();
-
-        ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 22px Inter, Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('+', 41, 38);
-        ctx.fillText('−', 41, 74);
-        ctx.restore();
-      }
-
-      // 6. Top-Right Info Card
+      // 5. Top-Right Info Card
       if (showInfoCard) {
         const selectedProv = state.selectedProvPerCanvas[dayIndex] && affectedProvs.has(state.selectedProvPerCanvas[dayIndex])
           ? state.selectedProvPerCanvas[dayIndex]
@@ -1843,7 +1818,7 @@
         doc.text(docNo ? `No: ${docNo}` : 'No:', pageW / 2, curY, { align: 'center' });
 
         curY += 4.5;
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('helvetica', 'normal');
         doc.text(
           `Berlaku Tanggal ${formatIndonesianDate(dates[0], false)} - ${formatIndonesianDate(dates[2], false)}`,
           pageW / 2,

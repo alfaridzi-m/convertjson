@@ -328,27 +328,6 @@ export function renderSingleMapCanvas(ctxIn: MapRenderContext): HitBox[] {
   }
 
   ctx.save()
-  drawRoundedRect(ctx, 22, 20, 38, 72, 6)
-  ctx.fillStyle = '#ffffff'
-  ctx.shadowColor = 'rgba(0,0,0,0.22)'
-  ctx.shadowBlur = 6
-  ctx.fill()
-  ctx.shadowColor = 'transparent'
-  ctx.strokeStyle = '#e2e8f0'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(22, 56)
-  ctx.lineTo(60, 56)
-  ctx.stroke()
-  ctx.fillStyle = '#1e293b'
-  ctx.font = 'bold 22px Inter, Arial, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('+', 41, 38)
-  ctx.fillText('−', 41, 74)
-  ctx.restore()
-
-  ctx.save()
   const attrText = drewSatellite
     ? 'Leaflet | Imagery © Esri'
     : 'BMKG Maritim | Peta Indonesia'

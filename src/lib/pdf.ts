@@ -112,7 +112,7 @@ export async function generateOfficialPDF(opts: GeneratePdfOptions): Promise<str
   doc.text(docNo ? `No: ${docNo}` : 'No:', pageW / 2, curY, { align: 'center' })
 
   curY += 4.5
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('helvetica', 'normal')
   doc.text(
     `Berlaku Tanggal ${formatIndonesianDate(dates[0], false)} - ${formatIndonesianDate(dates[2], false)}`,
     pageW / 2,

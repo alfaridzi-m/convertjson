@@ -69,7 +69,7 @@ defineExpose({
         <div class="text-[11.5px] leading-tight mt-1 font-medium">
           {{ docNumber.trim() ? `No: ${docNumber.trim()}` : 'No: -' }}
         </div>
-        <div class="text-[11.5px] leading-tight mt-0.5 font-semibold">
+        <div class="text-[11.5px] leading-tight mt-0.5">
           {{ validRangeText }}
         </div>
       </div>
