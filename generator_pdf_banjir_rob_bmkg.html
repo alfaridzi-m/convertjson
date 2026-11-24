@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BMKG Maritim - Generator PDF Informasi Potensi Banjir Pesisir (Rob)</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- jsPDF & jsPDF-AutoTable for Vector PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* A4 Paper Simulation in Preview */
+    .a4-sheet {
+      width: 794px; /* 210mm at 96 DPI */
+      min-height: 1123px; /* 297mm at 96 DPI */
+      background: #ffffff;
+      box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.22), 0 0 1px 1px rgba(15, 23, 42, 0.06);
+      transform-origin: top center;
+      transition: transform 0.2s ease;
+    }
+
+    .doc-serif {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    /* Table styling matching BMKG orange modern table design */
+    .bmkg-table-wrap {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px 8px 0 0;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .bmkg-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      line-height: 1.48;
+      color: #374151;
+    }
+    .bmkg-table thead tr {
+      background-color: #d5730c;
+    }
+    .bmkg-table th {
+      background-color: #d5730c;
+      color: #ffffff;
+      border: none;
+      padding: 9px 12px;
+      font-weight: 700;
+      text-align: left;
+      font-size: 11.5px;
+    }
+    .bmkg-table td {
+      border-top: 1px solid #e5e7eb;
+      border-right: 1px solid #e5e7eb;
+      padding: 10px 12px;
+      vertical-align: top;
+      background-color: #ffffff;
+    }
+    .bmkg-table td:last-child {
+      border-right: none;
+    }
+    .bmkg-prov-name {
+      color: #c65d0c;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 2.5px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Toast Notification Container (No alert() used) -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-white/10 p-1.5 flex items-center justify-center border border-white/15">
+          <canvas id="navLogoCanvas" width="80" height="80" class="w-full h-full object-contain"></canvas>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-sm sm:text-base tracking-tight">BMKG Maritim • Generator PDF Banjir Pesisir (Rob)</h1>
+            <span id="statusBadge" class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              Memuat Data...
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Konversi otomatis <code class="text-sky-300">banjirrob_combine.json</code> &amp; <code class="text-emerald-300">indonesia-prov.geojson</code> ke Dokumen PDF Resmi</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btnReloadApi" type="button" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5">
+          <i id="iconReload" class="fa-solid fa-arrows-rotate text-emerald-400"></i>
+          <span>Muat Ulang Source BMKG</span>
+        </button>
+        <button id="btnDownloadPdf" type="button" class="px-4 py-2 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/25 transition flex items-center gap-2">
+          <i id="iconPdf" class="fa-solid fa-file-pdf"></i>
+          <span id="textPdfBtn">Download PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto flex flex-col lg:flex-row gap-5 p-4 sm:p-5">
+
+    <!-- Left Control Sidebar (Hanya 3 Input: Nomor Surat, Kota, Unit Penandatangan) -->
+    <aside class="w-full lg:w-[370px] xl:w-[390px] shrink-0 flex flex-col gap-4">
+
+      <!-- Satu-satunya Panel Input: Nomor Surat, Kota, Unit Penandatangan -->
+      <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+        <div>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <i class="fa-solid fa-file-signature text-sky-600"></i>
+            Atribut Surat &amp; Penandatangan
+          </h2>
+          <p class="text-[11px] text-slate-400 mt-1">Seluruh data peta, periode 3 hari, tabel wilayah, dan himbauan diambil otomatis dari source BMKG.</p>
+        </div>
+
+        <div class="space-y-3.5 text-xs">
+          <div>
+            <label for="inputDocNumber" class="block font-semibold text-slate-700 mb-1.5">Nomor Surat (No:)</label>
+            <input id="inputDocNumber" type="text" placeholder="Contoh: B/ME.01.02/019/DMM/XI/BMKG-2026" value="" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition" />
+          </div>
+
+          <div>
+            <label for="inputSignCity" class="block font-semibold text-slate-700 mb-1.5">Kota</label>
+            <input id="inputSignCity" type="text" value="Jakarta" placeholder="Masukkan kota penandatangan" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition" />
+          </div>
+
+          <div>
+            <label for="inputSignUnit" class="block font-semibold text-slate-700 mb-1.5">Unit Penandatangan</label>
+            <input id="inputSignUnit" type="text" value="Direktorat Meteorologi Maritim" placeholder="Masukkan unit penandatangan" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition" />
+          </div>
+        </div>
+
+        <div class="pt-2">
+          <button id="btnDownloadPdfSide" type="button" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-arrow-down"></i>
+            <span>Cetak / Download PDF Sekarang</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Info Read-Only Source Data Otomatis -->
+      <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-3.5">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+          <i class="fa-solid fa-satellite-dish text-emerald-600"></i>
+          Status Source Data BMKG (Otomatis)
+        </h2>
+
+        <div class="space-y-2 text-xs">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold text-slate-700">indonesia-prov.geojson</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">GeoJSON</span>
+            </div>
+            <div id="geoStatusText" class="text-[11px] text-slate-500 mt-1 break-all">Mengambil dari maritim.bmkg.go.id...</div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold text-slate-700">banjirrob_combine.json</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">JSON</span>
+            </div>
+            <div id="robStatusText" class="text-[11px] text-slate-500 mt-1 break-all">Mengambil dari maritim.bmkg.go.id...</div>
+          </div>
+        </div>
+
+        <!-- Ringkasan Otomatis 3 Hari -->
+        <div>
+          <div class="text-[11px] font-semibold text-slate-500 mb-2">Ringkasan Kejadian 3 Hari (H+1 s/d H+3)</div>
+          <div id="daySummaryGrid" class="grid grid-cols-3 gap-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Right Main Area: Live A4 Preview -->
+    <section class="flex-1 min-w-0 flex flex-col bg-slate-200/75 rounded-2xl border border-slate-300/80 overflow-hidden">
+
+      <!-- Preview Toolbar -->
+      <div class="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 text-xs font-medium text-slate-600">
+          <i class="fa-regular fa-eye text-sky-600"></i>
+          <span>Pratinjau Dokumen PDF (Ukuran A4)</span>
+          <span class="text-slate-300">|</span>
+          <span class="text-[11px] text-slate-500">Klik provinsi berwarna oranye pada peta untuk memilih highlight info wilayah</span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <button type="button" data-zoom="0.65" class="zoom-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">65%</button>
+          <button type="button" data-zoom="0.85" class="zoom-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">85%</button>
+          <button type="button" data-zoom="1" class="zoom-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-600 text-white">100%</button>
+        </div>
+      </div>
+
+      <!-- Scrollable A4 Sheets Container -->
+      <div id="previewScrollArea" class="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center gap-8">
+
+        <!-- ================= PAGE 1: KOP SURAT + 3 MAP CANVASES ================= -->
+        <div id="a4Page1" class="a4-sheet doc-serif px-10 py-8 flex flex-col justify-between text-black">
+          <div>
+            <!-- Kop Surat Resmi BMKG -->
+            <div class="flex items-center gap-4 pb-2.5 border-b-[2.5px] border-black">
+              <div class="w-[68px] h-[68px] shrink-0 flex items-center justify-center">
+                <canvas id="kopLogoCanvas" width="200" height="200" class="w-full h-full object-contain"></canvas>
+              </div>
+              <div class="flex-1 text-center pr-4">
+                <div class="font-bold text-[12.5px] leading-snug tracking-tight uppercase">
+                  THE AGENCY FOR METEOROLOGY, CLIMATOLOGY, AND<br />
+                  GEOPHYSICS OF THE REPUBLIC OF INDONESIA (BMKG)
+                </div>
+                <div class="text-[10.5px] leading-snug mt-0.5 text-gray-800">
+                  Jl. Angkasa I No. 2, Jakarta 10610 Telp: (021) 4246321 Fax: (021) 4246703<br />
+                  P. O. BOX 3540 JKT, Website: http://www.bmkg.go.id
+                </div>
+              </div>
+            </div>
+
+            <!-- Judul Dokumen -->
+            <div class="text-center mt-3 mb-3">
+              <h2 class="font-bold text-[14px] leading-tight uppercase">INFORMASI POTENSI BANJIR PESISIR (ROB)</h2>
+              <div class="font-bold text-[12.5px] leading-tight mt-0.5">Wilayah Indonesia</div>
+              <div id="previewDocNo" class="text-[11.5px] leading-tight mt-1 font-medium">No: -</div>
+              <div id="previewValidRange" class="text-[11.5px] leading-tight mt-0.5 font-semibold">Berlaku Tanggal -</div>
+            </div>
+
+            <!-- 3 Stacked Indonesia Map Canvases (H+1, H+2, H+3) -->
+            <div class="space-y-2.5 mt-2">
+              <!-- H+1 -->
+              <div>
+                <div id="labelMap0" class="hidden text-[11px] font-bold mb-0.5 text-gray-800"></div>
+                <div class="w-full rounded-lg overflow-hidden border border-slate-300 bg-[#05334d]">
+                  <canvas id="mapCanvas0" width="1400" height="545" class="w-full h-auto block cursor-pointer"></canvas>
+                </div>
+              </div>
+
+              <!-- H+2 -->
+              <div>
+                <div id="labelMap1" class="hidden text-[11px] font-bold mb-0.5 text-gray-800"></div>
+                <div class="w-full rounded-lg overflow-hidden border border-slate-300 bg-[#05334d]">
+                  <canvas id="mapCanvas1" width="1400" height="545" class="w-full h-auto block cursor-pointer"></canvas>
+                </div>
+              </div>
+
+              <!-- H+3 -->
+              <div>
+                <div id="labelMap2" class="hidden text-[11px] font-bold mb-0.5 text-gray-800"></div>
+                <div class="w-full rounded-lg overflow-hidden border border-slate-300 bg-[#05334d]">
+                  <canvas id="mapCanvas2" width="1400" height="545" class="w-full h-auto block cursor-pointer"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-center text-[10.5px] text-gray-500 pt-2">- 1 -</div>
+        </div>
+
+        <!-- ================= PAGE 2: TABEL WILAYAH + HIMBAUAN + TTD ================= -->
+        <div id="a4Page2" class="a4-sheet doc-serif px-11 py-10 flex flex-col justify-between text-black">
+          <div>
+            <!-- Tabel Potensi Banjir Pesisir 3 Hari -->
+            <div class="bmkg-table-wrap">
+              <table class="bmkg-table">
+                <thead>
+                  <tr>
+                    <th class="w-[16%]">Provinsi</th>
+                    <th id="thDay0" class="w-[28%]">H+1</th>
+                    <th id="thDay1" class="w-[28%]">H+2</th>
+                    <th id="thDay2" class="w-[28%]">H+3</th>
+                  </tr>
+                </thead>
+                <tbody id="previewTableBody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Himbauan Resmi -->
+            <div class="mt-6 space-y-3 text-[12px] leading-relaxed text-justify text-gray-900">
+              <p id="previewHimbauan1"></p>
+              <p id="previewHimbauan2"></p>
+              <p id="previewHimbauan3"></p>
+            </div>
+
+            <!-- Signature Block -->
+            <div class="mt-8 flex justify-end">
+              <div class="text-left min-w-[235px] text-[12px] leading-relaxed">
+                <div id="previewSignDate">Jakarta, -</div>
+                <div id="previewSignUnit" class="font-bold mt-0.5">Direktorat Meteorologi Maritim</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-center text-[11px] text-gray-700 pt-6">- 2 -</div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // KONFIGURASI URL SUMBER DATA BMKG & KONSTANTA RESMI
+    // =========================================================================
+    const BMKG_GEOJSON_URL = 'https://maritim.bmkg.go.id/marine2026-data/meta/indonesia-prov.geojson';
+    const BMKG_BANJIRROB_URL = 'https://maritim.bmkg.go.id/marine2026-data/w-banjirob/banjirrob_combine.json';
+
+    // Teks Himbauan Resmi Sesuai Template PDF BMKG
+    const OFFICIAL_HIMBAUAN = [
+      'Potensi banjir pesisir umumnya berdampak pada aktivitas masyarakat di sekitar pelabuhan dan pesisir, seperti aktivitas bongkar muat di pelabuhan, aktivitas di pemukiman pesisir, serta aktivitas tambak garam dan perikanan darat.',
+      'Masyarakat diimbau untuk selalu waspada dan siaga untuk mengantisipasi dampak dari Pasang Air Laut Maksimum serta memperhatikan update informasi cuaca maritim dari BMKG.',
+      'Demikian informasi peringatan dini ini untuk dapat diantisipasi.'
+    ];
+
+    const INDONESIAN_MONTHS = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const INDONESIAN_DAYS = [
+      'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+    ];
+
+    // Daftar kanonik 38 Provinsi Indonesia beserta sinonim/alias untuk pencocokan akurat
+    const PROVINCE_ALIASES = {
+      'Aceh': ['aceh', 'nanggroe aceh darussalam', 'nad', 'di aceh', 'daerah istimewa aceh'],
+      'Sumatera Utara': ['sumatera utara', 'sumatra utara', 'sumut'],
+      'Sumatera Barat': ['sumatera barat', 'sumatra barat', 'sumbar'],
+      'Riau': ['riau'],
+      'Kepulauan Riau': ['kepulauan riau', 'kep riau', 'kep. riau', 'kepri'],
+      'Jambi': ['jambi'],
+      'Sumatera Selatan': ['sumatera selatan', 'sumatra selatan', 'sumsel'],
+      'Kepulauan Bangka Belitung': ['kepulauan bangka belitung', 'bangka belitung', 'kep bangka belitung', 'kep. bangka belitung', 'babel'],
+      'Bengkulu': ['bengkulu'],
+      'Lampung': ['lampung'],
+      'DKI Jakarta': ['dki jakarta', 'daerah khusus ibukota jakarta', 'jakarta', 'dkijakarta'],
+      'Banten': ['banten'],
+      'Jawa Barat': ['jawa barat', 'jabar'],
+      'Jawa Tengah': ['jawa tengah', 'jateng'],
+      'DI Yogyakarta': ['di yogyakarta', 'daerah istimewa yogyakarta', 'd.i. yogyakarta', 'yogyakarta', 'diy'],
+      'Jawa Timur': ['jawa timur', 'jatim'],
+      'Bali': ['bali'],
+      'Nusa Tenggara Barat': ['nusa tenggara barat', 'nusatenggara barat', 'ntb'],
+      'Nusa Tenggara Timur': ['nusa tenggara timur', 'nusatenggara timur', 'ntt'],
+      'Kalimantan Barat': ['kalimantan barat', 'kalbar'],
+      'Kalimantan Tengah': ['kalimantan tengah', 'kalteng'],
+      'Kalimantan Selatan': ['kalimantan selatan', 'kalsel'],
+      'Kalimantan Timur': ['kalimantan timur', 'kaltim'],
+      'Kalimantan Utara': ['kalimantan utara', 'kaltara'],
+      'Sulawesi Utara': ['sulawesi utara', 'sulut'],
+      'Gorontalo': ['gorontalo'],
+      'Sulawesi Tengah': ['sulawesi tengah', 'sulteng'],
+      'Sulawesi Barat': ['sulawesi barat', 'sulbar'],
+      'Sulawesi Selatan': ['sulawesi selatan', 'sulsel'],
+      'Sulawesi Tenggara': ['sulawesi tenggara', 'sultra'],
+      'Maluku': ['maluku'],
+      'Maluku Utara': ['maluku utara', 'malut', 'maluku_utara'],
+      'Papua Barat': ['papua barat', 'irian jaya barat'],
+      'Papua Barat Daya': ['papua barat daya'],
+      'Papua': ['papua', 'irian jaya'],
+      'Papua Tengah': ['papua tengah', 'irian jaya tengah'],
+      'Papua Pegunungan': ['papua pegunungan'],
+      'Papua Selatan': ['papua selatan']
+    };
+
+    // =========================================================================
+    // STATE APLIKASI UTAMA
+    // =========================================================================
+    const state = {
+      geoJson: null,
+      geoSourceLabel: 'Memuat...',
+      rawRobJson: null,
+      robSourceLabel: 'Memuat...',
+      // Normalized structure: { "YYYY-MM-DD": { "Jawa Tengah": { "Pemalang": ["Pesisir Ulujami"] } } }
+      normalizedByDate: {},
+      baseDateISO: '',     // Tanggal Hari Ini (TTD)
+      startDateH1ISO: '',  // Tanggal H+1
+      selectedProvPerCanvas: [null, null, null], // Province clicked on canvas 0, 1, 2
+      canvasHitBoxes: [[], [], []],              // Interactive bounding boxes per canvas
+      esriTilesCache: {},                        // Cached Image tiles for Esri World Imagery
+      esriReady: false,
+      zoomLevel: 1
+    };
+
+    // Web Mercator Viewport Bounds for Indonesia Map Canvas
+    const MAP_BOUNDS = {
+      minLon: 94.4,
+      maxLon: 141.6,
+      minLat: -11.4,
+      maxLat: 6.4
+    };
+
+    // =========================================================================
+    // UTILITAS TANGGAL & NOTIFIKASI TOAST
+    // =========================================================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const colors = {
+        info: 'bg-slate-900 text-white border-slate-700',
+        success: 'bg-emerald-900 text-emerald-50 border-emerald-700',
+        warning: 'bg-amber-900 text-amber-50 border-amber-700',
+        error: 'bg-rose-900 text-rose-50 border-rose-700'
+      };
+      const icons = {
+        info: 'fa-circle-info text-sky-400',
+        success: 'fa-circle-check text-emerald-400',
+        warning: 'fa-triangle-exclamation text-amber-400',
+        error: 'fa-circle-xmark text-rose-400'
+      };
+
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto flex items-start gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs font-medium transition-all duration-300 ${colors[type] || colors.info}`;
+      el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} mt-0.5"></i><div class="flex-1 leading-relaxed">${message}</div>`;
+      container.appendChild(el);
+
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(8px)';
+        setTimeout(() => el.remove(), 300);
+      }, 4200);
+    }
+
+    function toISODate(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function addDaysISO(isoStr, days) {
+      const [y, m, d] = isoStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setDate(dt.getDate() + days);
+      return toISODate(dt);
+    }
+
+    function formatIndonesianDate(isoStr, withDayName = false) {
+      if (!isoStr || !/^\d{4}-\d{2}-\d{2}$/.test(isoStr)) return '-';
+      const [y, m, d] = isoStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const base = `${d} ${INDONESIAN_MONTHS[m - 1]} ${y}`;
+      return withDayName ? `${INDONESIAN_DAYS[dt.getDay()]}, ${base}` : base;
+    }
+
+    // =========================================================================
+    // NORMALISASI NAMA PROVINSI & DETEKSI TANGGAL UNIVERSAL
+    // =========================================================================
+    function cleanProvinceKey(raw) {
+      if (!raw || typeof raw !== 'string') return '';
+      return raw
+        .toLowerCase()
+        .replace(/^provinsi\s+/i, '')
+        .replace(/^propinsi\s+/i, '')
+        .replace(/^prov\.?\s+/i, '')
+        .replace(/[._-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    const ALIAS_LOOKUP = (() => {
+      const map = new Map();
+      for (const [canonical, aliases] of Object.entries(PROVINCE_ALIASES)) {
+        map.set(cleanProvinceKey(canonical), canonical);
+        for (const a of aliases) {
+          map.set(cleanProvinceKey(a), canonical);
+        }
+      }
+      return map;
+    })();
+
+    function matchCanonicalProvince(str) {
+      if (!str || typeof str !== 'string') return null;
+      const cleaned = cleanProvinceKey(str);
+      if (!cleaned) return null;
+      if (ALIAS_LOOKUP.has(cleaned)) return ALIAS_LOOKUP.get(cleaned);
+
+      // Partial match for strings like "Perairan Jawa Tengah" only if explicitly matching known province
+      for (const [aliasKey, canonical] of ALIAS_LOOKUP.entries()) {
+        if (aliasKey.length >= 4 && cleaned === aliasKey) {
+          return canonical;
+        }
+      }
+      return null;
+    }
+
+    function getFeatureProvinceName(feature) {
+      if (!feature || !feature.properties) return null;
+      const props = feature.properties;
+      const candidateKeys = [
+        'provinsi', 'Provinsi', 'PROVINSI', 'Propinsi', 'PROPINSI', 'propinsi',
+        'WADMPR', 'wadmpr', 'NAME_1', 'name', 'NAME', 'nama', 'NAMA', 'nama_prov',
+        'NAMA_PROV', 'prov_name', 'state', 'prov'
+      ];
+      for (const k of candidateKeys) {
+        if (props[k] && typeof props[k] === 'string') {
+          const matched = matchCanonicalProvince(props[k]);
+          if (matched) return matched;
+          return props[k].trim();
+        }
+      }
+      // Fallback scan all string properties
+      for (const val of Object.values(props)) {
+        if (typeof val === 'string') {
+          const matched = matchCanonicalProvince(val);
+          if (matched) return matched;
+        }
+      }
+      return null;
+    }
+
+    const MONTH_NAME_MAP = {
+      januari: 1, jan: 1, january: 1,
+      februari: 2, feb: 2, pebruari: 2, february: 2,
+      maret: 3, mar: 3, march: 3,
+      april: 4, apr: 4,
+      mei: 5, may: 5,
+      juni: 6, jun: 6, june: 6,
+      juli: 7, jul: 7, july: 7,
+      agustus: 8, agu: 8, ags: 8, aug: 8, august: 8,
+      september: 9, sep: 9, sept: 9,
+      oktober: 10, okt: 10, oct: 10, october: 10,
+      november: 11, nov: 11, nopember: 11,
+      desember: 12, des: 12, dec: 12, december: 12
+    };
+
+    function parseSingleDateISO(val) {
+      if (!val || typeof val !== 'string') return null;
+      const s = val.trim();
+
+      // YYYY-MM-DD or YYYY/MM/DD (with optional time)
+      let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s].*)?$/);
+      if (m) {
+        const yr = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
+        if (yr >= 2020 && yr <= 2100 && mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+          return `${yr}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+        }
+      }
+
+      // DD-MM-YYYY or DD/MM/YYYY
+      m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s.*)?$/);
+      if (m) {
+        const da = Number(m[1]), mo = Number(m[2]), yr = Number(m[3]);
+        if (yr >= 2020 && yr <= 2100 && mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+          return `${yr}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+        }
+      }
+
+      // Indonesian/English text date e.g. "Kamis, 19 November 2026" or "19 Nov 2026"
+      m = s.match(/(?:[a-zA-Z]+,\s*)?(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+      if (m) {
+        const da = Number(m[1]);
+        const mo = MONTH_NAME_MAP[m[2].toLowerCase()];
+        const yr = Number(m[3]);
+        if (mo && yr >= 2020 && yr <= 2100 && da >= 1 && da <= 31) {
+          return `${yr}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+        }
+      }
+
+      return null;
+    }
+
+    function expandDateRangeISO(startISO, endISO) {
+      if (!startISO || !endISO) return startISO ? [startISO] : (endISO ? [endISO] : []);
+      if (endISO < startISO) return [startISO];
+      const list = [];
+      let cur = startISO;
+      let guard = 0;
+      while (cur <= endISO && guard < 40) {
+        list.push(cur);
+        cur = addDaysISO(cur, 1);
+        guard++;
+      }
+      return list;
+    }
+
+    function parseDatesFromValue(val) {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        const acc = [];
+        for (const item of val) {
+          acc.push(...parseDatesFromValue(item));
+        }
+        return [...new Set(acc)];
+      }
+      if (typeof val !== 'string') return [];
+
+      const single = parseSingleDateISO(val);
+      if (single) return [single];
+
+      // Range like "19 - 21 November 2026" or "19 s/d 21 November 2026"
+      let m = val.match(/(\d{1,2})\s*(?:-|–|s\/d|sd|sampai(?:\s+dengan)?)\s*(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/i);
+      if (m) {
+        const d1 = Number(m[1]), d2 = Number(m[2]);
+        const mo = MONTH_NAME_MAP[m[3].toLowerCase()];
+        const yr = Number(m[4]);
+        if (mo) {
+          const s1 = `${yr}-${String(mo).padStart(2, '0')}-${String(d1).padStart(2, '0')}`;
+          const s2 = `${yr}-${String(mo).padStart(2, '0')}-${String(d2).padStart(2, '0')}`;
+          return expandDateRangeISO(s1, s2);
+        }
+      }
+
+      // Range with two full dates "19 November 2026 - 21 November 2026" or "2026-11-19 s/d 2026-11-21"
+      const parts = val.split(/\s*(?:s\/d|sd|sampai(?:\s+dengan)?|\s-\s|–)\s*/i);
+      if (parts.length === 2) {
+        // Handle "28 Oktober - 2 November 2026"
+        let dStart = parseSingleDateISO(parts[0]);
+        const dEnd = parseSingleDateISO(parts[1]);
+        if (!dStart && dEnd) {
+          const yearSuffix = dEnd.slice(0, 4);
+          dStart = parseSingleDateISO(`${parts[0].trim()} ${yearSuffix}`);
+        }
+        if (dStart && dEnd) return expandDateRangeISO(dStart, dEnd);
+      }
+
+      return [];
+    }
+
+    // =========================================================================
+    // UNIVERSAL PARSER UNTUK banjirrob_combine.json
+    // =========================================================================
+    function parseBanjirRobJSON(raw) {
+      const result = {}; // { [dateISO]: { [prov]: { [kab]: Set(pesisir) } } }
+
+      function recordEntry(dates, prov, kab, pesisirItems) {
+        if (!prov || !dates || dates.length === 0) return;
+        const canonicalProv = matchCanonicalProvince(prov) || prov.trim();
+        const cleanKab = (kab || '').toString().trim().replace(/:$/, '');
+
+        const items = [];
+        const rawArr = Array.isArray(pesisirItems) ? pesisirItems : [pesisirItems];
+        for (const rawItem of rawArr) {
+          if (!rawItem) continue;
+          if (typeof rawItem === 'string') {
+            // Check if formatted as "Pemalang: Pesisir Ulujami" when kab is empty
+            if (!cleanKab && rawItem.includes(':')) {
+              const idx = rawItem.indexOf(':');
+              const subKab = rawItem.slice(0, idx).trim();
+              const subPes = rawItem.slice(idx + 1).split(',').map(x => x.trim()).filter(Boolean);
+              recordEntry(dates, canonicalProv, subKab, subPes);
+              continue;
+            }
+            const splitComma = rawItem.split(',').map(s => s.trim()).filter(Boolean);
+            items.push(...splitComma);
+          } else if (typeof rawItem === 'object') {
+            const nameCandidate = rawItem.pesisir || rawItem.kecamatan || rawItem.nama_kecamatan || rawItem.nama || rawItem.lokasi || rawItem.wilayah || rawItem.area;
+            if (nameCandidate) items.push(...(Array.isArray(nameCandidate) ? nameCandidate : [String(nameCandidate)]));
+          }
+        }
+
+        for (const dt of dates) {
+          if (!result[dt]) result[dt] = {};
+          if (!result[dt][canonicalProv]) result[dt][canonicalProv] = {};
+          const kabKey = cleanKab || '_umum_';
+          if (!result[dt][canonicalProv][kabKey]) {
+            result[dt][canonicalProv][kabKey] = new Set();
+          }
+          for (const p of items) {
+            if (p) result[dt][canonicalProv][kabKey].add(p);
+          }
+        }
+      }
+
+      const IGNORE_META_KEYS = new Set([
+        'updated', 'updated_at', 'created_at', 'issued', 'issued_at', 'generated_at',
+        'last_update', 'timestamp', 'waktu_buat', 'tgl_rilis'
+      ]);
+
+      const START_KEYS = ['tgl_awal', 'tanggal_awal', 'tgl_mulai', 'tanggal_mulai', 'berlaku_awal', 'waktu_awal', 'start_date', 'date_start', 'date_from', 'valid_from', 'valid_start', 'mulai', 'awal', 'dari', 'start', 'from'];
+      const END_KEYS = ['tgl_akhir', 'tanggal_akhir', 'tgl_selesai', 'tanggal_selesai', 'berlaku_akhir', 'waktu_akhir', 'end_date', 'date_end', 'date_to', 'valid_to', 'valid_end', 'sampai', 'akhir', 'selesai', 'berakhir', 'end', 'to'];
+      const SINGLE_DATE_KEYS = ['tanggal', 'tgl', 'date', 'dates', 'periode', 'valid_date', 'berlaku', 'jadwal', 'hari'];
+      const PROV_KEYS = ['provinsi', 'nama_provinsi', 'prov', 'propinsi', 'province', 'wadmpr', 'nama_prov', 'wilayah_provinsi'];
+      const KAB_KEYS = ['kabupaten', 'kabkot', 'kab_kota', 'kota', 'nama_kabkot', 'nama_kabupaten', 'nama_kota', 'kab', 'regency', 'wadmkk'];
+      const PESISIR_KEYS = ['pesisir', 'kecamatan', 'nama_kecamatan', 'kec', 'lokasi', 'daerah', 'area', 'pantai', 'list_pesisir', 'list_kecamatan', 'daftar_pesisir', 'wadmkc', 'detail_wilayah'];
+
+      function traverse(node, ctx) {
+        if (!node) return;
+
+        if (Array.isArray(node)) {
+          for (const item of node) {
+            if (typeof item === 'string' && ctx.prov && ctx.dates.length > 0) {
+              recordEntry(ctx.dates, ctx.prov, ctx.kab, item);
+            } else {
+              traverse(item, ctx);
+            }
+          }
+          return;
+        }
+
+        if (typeof node !== 'object') {
+          if (typeof node === 'string' && ctx.prov && ctx.dates.length > 0) {
+            recordEntry(ctx.dates, ctx.prov, ctx.kab, node);
+          }
+          return;
+        }
+
+        // Handle GeoJSON FeatureCollection / Feature if banjirrob_combine.json is GeoJSON
+        if (node.type === 'FeatureCollection' && Array.isArray(node.features)) {
+          traverse(node.features, ctx);
+          return;
+        }
+        if (node.type === 'Feature' && node.properties) {
+          traverse(node.properties, ctx);
+          return;
+        }
+
+        const nextCtx = {
+          dates: [...ctx.dates],
+          prov: ctx.prov,
+          kab: ctx.kab
+        };
+
+        // 1. Check start/end date range fields on this object
+        let dStart = null, dEnd = null;
+        for (const k of START_KEYS) {
+          if (node[k]) {
+            const parsed = parseDatesFromValue(node[k]);
+            if (parsed.length) { dStart = parsed[0]; break; }
+          }
+        }
+        for (const k of END_KEYS) {
+          if (node[k]) {
+            const parsed = parseDatesFromValue(node[k]);
+            if (parsed.length) { dEnd = parsed[parsed.length - 1]; break; }
+          }
+        }
+        if (dStart || dEnd) {
+          nextCtx.dates = expandDateRangeISO(dStart || dEnd, dEnd || dStart);
+        }
+
+        // 2. Check explicit single/multi date fields
+        for (const k of SINGLE_DATE_KEYS) {
+          if (node[k] !== undefined) {
+            const parsed = parseDatesFromValue(node[k]);
+            if (parsed.length) nextCtx.dates = parsed;
+          }
+        }
+
+        // 3. Check province field
+        for (const k of PROV_KEYS) {
+          if (typeof node[k] === 'string' && node[k].trim()) {
+            nextCtx.prov = matchCanonicalProvince(node[k]) || node[k].trim();
+            break;
+          }
+        }
+
+        // 4. Check kabupaten/kota field
+        let foundExplicitKab = false;
+        for (const k of KAB_KEYS) {
+          if (typeof node[k] === 'string' && node[k].trim()) {
+            nextCtx.kab = node[k].trim();
+            foundExplicitKab = true;
+            break;
+          }
+        }
+
+        // 5. Check pesisir/kecamatan leaf field
+        let consumedLeafPesisir = false;
+        for (const k of PESISIR_KEYS) {
+          if (node[k] !== undefined && node[k] !== null) {
+            const val = node[k];
+            if (typeof val === 'string' || (Array.isArray(val) && val.every(x => typeof x === 'string'))) {
+              if (nextCtx.prov && nextCtx.dates.length > 0) {
+                recordEntry(nextCtx.dates, nextCtx.prov, nextCtx.kab, val);
+                consumedLeafPesisir = true;
+              }
+            }
+          }
+        }
+
+        // Check if "wilayah" is string or array of strings when prov & dates exist
+        if (!consumedLeafPesisir && node.wilayah !== undefined) {
+          if (typeof node.wilayah === 'string' || (Array.isArray(node.wilayah) && node.wilayah.every(x => typeof x === 'string'))) {
+            if (nextCtx.prov && nextCtx.dates.length > 0) {
+              recordEntry(nextCtx.dates, nextCtx.prov, nextCtx.kab, node.wilayah);
+              consumedLeafPesisir = true;
+            }
+          }
+        }
+
+        // If province + date exist on a flat record with no pesisir details at all, still mark province!
+        if (nextCtx.prov && nextCtx.dates.length > 0 && foundExplicitKab && !consumedLeafPesisir) {
+          // Check if there are nested arrays/objects before recording empty pesisir
+          const hasNestedObjects = Object.values(node).some(v => v && typeof v === 'object');
+          if (!hasNestedObjects) {
+            recordEntry(nextCtx.dates, nextCtx.prov, nextCtx.kab, []);
+          }
+        }
+
+        // 6. Traverse keys (handles dictionary keys that are Dates, Provinces, or Kabupaten!)
+        for (const [key, val] of Object.entries(node)) {
+          if (IGNORE_META_KEYS.has(key.toLowerCase())) continue;
+          if (val === null || val === undefined) continue;
+          if (PESISIR_KEYS.includes(key) && consumedLeafPesisir) continue;
+
+          const keyDates = parseDatesFromValue(key);
+          const keyProv = matchCanonicalProvince(key);
+
+          if (keyDates.length > 0) {
+            traverse(val, { ...nextCtx, dates: keyDates });
+          } else if (keyProv) {
+            // If val is empty string/true/number when dates are known, record province
+            if (typeof val !== 'object' && nextCtx.dates.length > 0) {
+              recordEntry(nextCtx.dates, keyProv, '', typeof val === 'string' ? val : []);
+            } else {
+              traverse(val, { ...nextCtx, prov: keyProv, kab: '' });
+            }
+          } else if (nextCtx.prov && !foundExplicitKab && (Array.isArray(val) || typeof val === 'object' || typeof val === 'string')) {
+            // Inside a known province object, e.g. { "Pemalang": ["Pesisir Ulujami"] }
+            const reservedContainerKeys = new Set(['data', 'wilayah', 'detail', 'items', 'list', 'result', 'results', 'features', 'jadwal', 'rob', 'banjirrob']);
+            if (!reservedContainerKeys.has(key.toLowerCase()) && !SINGLE_DATE_KEYS.includes(key.toLowerCase()) && !PROV_KEYS.includes(key.toLowerCase())) {
+              if (Array.isArray(val) && val.every(x => typeof x === 'string') && nextCtx.dates.length > 0) {
+                recordEntry(nextCtx.dates, nextCtx.prov, key, val);
+              } else if (typeof val === 'string' && nextCtx.dates.length > 0 && !START_KEYS.includes(key) && !END_KEYS.includes(key)) {
+                // Avoid treating metadata fields like "id" or "status" as kabupaten
+                const metaSkip = new Set(['id', 'kode', 'status', 'level', 'kategori', 'warna', 'color', 'upt', 'stasiun', 'nomor', 'catatan', 'keterangan']);
+                if (!metaSkip.has(key.toLowerCase())) {
+                  recordEntry(nextCtx.dates, nextCtx.prov, key, val);
+                }
+              } else if (typeof val === 'object') {
+                traverse(val, { ...nextCtx, kab: key });
+              }
+            } else {
+              traverse(val, nextCtx);
+            }
+          } else if (typeof val === 'object') {
+            traverse(val, nextCtx);
+          }
+        }
+      }
+
+      traverse(raw, { dates: [], prov: null, kab: '' });
+
+      // Convert Sets to sorted/clean Arrays
+      const finalNormalized = {};
+      for (const dt of Object.keys(result).sort()) {
+        finalNormalized[dt] = {};
+        for (const prov of Object.keys(result[dt])) {
+          finalNormalized[dt][prov] = {};
+          for (const [kab, setItems] of Object.entries(result[dt][prov])) {
+            finalNormalized[dt][prov][kab] = Array.from(setItems);
+          }
+        }
+      }
+      return finalNormalized;
+    }
+
+    function formatPesisirItem(name, autoPrefix) {
+      const trimmed = name.trim();
+      if (!trimmed) return '';
+      if (!autoPrefix) return trimmed;
+      const hasPrefix = /^(pesisir|pantai|perairan|kepulauan|kep\.|pulau|teluk|muara|pelabuhan|kecamatan|kec\.|kota|kab\.|kabupaten)\b/i.test(trimmed);
+      return hasPrefix ? trimmed : `Pesisir ${trimmed}`;
+    }
+
+    // =========================================================================
+    // LOGO BMKG, PROYEKSI WEB MERCATOR & PRECOMPUTE PATH2D CEPAT
+    // =========================================================================
+    function drawBMKGLogo(canvas) {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const r = Math.min(w, h) * 0.44;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+
+      // Lingkaran dasar putih dengan tepi halus
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      // Klip ke lingkaran utama logo
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Bagian atas: Atmosfer biru BMKG
+      ctx.fillStyle = '#005baa';
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 0.92);
+
+      // Bagian tengah: Garis hijau daratan/khatulistiwa
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(cx - r, cy - r * 0.12, r * 2, r * 0.62);
+
+      const stripeColors = ['#16a34a', '#15803d', '#16a34a'];
+      stripeColors.forEach((color, idx) => {
+        const sy = cy - r * 0.04 + idx * (r * 0.17);
+        ctx.beginPath();
+        ctx.moveTo(cx - r, sy + r * 0.06);
+        ctx.quadraticCurveTo(cx, sy - r * 0.12, cx + r, sy + r * 0.06);
+        ctx.lineWidth = Math.max(2.5, r * 0.095);
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      });
+
+      // Bagian bawah: Gelombang laut & geofisika biru tua / abu-abu
+      ctx.fillStyle = '#0f2942';
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy + r * 0.46);
+      ctx.bezierCurveTo(cx - r * 0.35, cy + r * 0.28, cx + r * 0.35, cy + r * 0.65, cx + r, cy + r * 0.42);
+      ctx.lineTo(cx + r, cy + r);
+      ctx.lineTo(cx - r, cy + r);
+      ctx.closePath();
+      ctx.fill();
+
+      // Pusaran angin putih di bagian atas
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(2, r * 0.08);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, cy - r * 0.42, r * 0.24, Math.PI * 0.15, Math.PI * 1.45);
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Ring luar tipis
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(1.5, r * 0.04);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.stroke();
+    }
+
+    function mercatorX(lon) {
+      return (lon + 180) / 360;
+    }
+
+    function mercatorY(lat) {
+      const clamped = Math.max(-85, Math.min(85, lat));
+      const rad = (clamped * Math.PI) / 180;
+      return (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2;
+    }
+
+    function createProjector(width, height) {
+      const minX = mercatorX(MAP_BOUNDS.minLon);
+      const maxX = mercatorX(MAP_BOUNDS.maxLon);
+      const minY = mercatorY(MAP_BOUNDS.maxLat);
+      const maxY = mercatorY(MAP_BOUNDS.minLat);
+
+      const spanX = maxX - minX;
+      const spanY = maxY - minY;
+      const scale = Math.min(width / spanX, height / spanY);
+      const offsetX = (width - spanX * scale) / 2;
+      const offsetY = (height - spanY * scale) / 2;
+
+      return {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        scale,
+        offsetX,
+        offsetY,
+        project(lon, lat) {
+          return [
+            (mercatorX(lon) - minX) * scale + offsetX,
+            (mercatorY(lat) - minY) * scale + offsetY
+          ];
+        }
+      };
+    }
+
+    let canvasRedrawPending = false;
+    function scheduleCanvasRedraw() {
+      if (canvasRedrawPending) return;
+      canvasRedrawPending = true;
+      requestAnimationFrame(() => {
+        canvasRedrawPending = false;
+        renderAllCanvases();
+      });
+    }
+
+    function preloadEsriSatelliteTiles() {
+      const W = 1400;
+      const H = 545;
+      const proj = createProjector(W, H);
+      const z = 5;
+      const n = Math.pow(2, z);
+
+      const viewMinX = proj.minX - proj.offsetX / proj.scale;
+      const viewMaxX = proj.minX + (W - proj.offsetX) / proj.scale;
+      const viewMinY = proj.minY - proj.offsetY / proj.scale;
+      const viewMaxY = proj.minY + (H - proj.offsetY) / proj.scale;
+
+      const txStart = Math.max(0, Math.floor(viewMinX * n));
+      const txEnd = Math.min(n - 1, Math.floor(viewMaxX * n));
+      const tyStart = Math.max(0, Math.floor(viewMinY * n));
+      const tyEnd = Math.min(n - 1, Math.floor(viewMaxY * n));
+
+      for (let ty = tyStart; ty <= tyEnd; ty++) {
+        for (let tx = txStart; tx <= txEnd; tx++) {
+          const key = `${z}/${ty}/${tx}`;
+          if (state.esriTilesCache[key]) continue;
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            state.esriTilesCache[key] = img;
+            state.esriReady = true;
+            scheduleCanvasRedraw();
+          };
+          img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}`;
+        }
+      }
+    }
+
+    // Pre-kompilasi Path2D sekali saat GeoJSON dimuat agar render 3 canvas instan (<5ms)
+    function prepareGeoFeatures(geoJson) {
+      state.preparedFeatures = [];
+      if (!geoJson || !Array.isArray(geoJson.features)) return;
+
+      const proj = createProjector(1400, 545);
+
+      for (const feature of geoJson.features) {
+        const geom = feature.geometry;
+        if (!geom) continue;
+
+        const provName = getFeatureProvinceName(feature);
+        const polys = geom.type === 'Polygon'
+          ? [geom.coordinates]
+          : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+
+        const path = new Path2D();
+        let minBx = Infinity, minBy = Infinity, maxBx = -Infinity, maxBy = -Infinity;
+
+        for (const poly of polys) {
+          for (const ring of poly) {
+            if (!ring || ring.length === 0) continue;
+            let lastPx = -9999, lastPy = -9999;
+            for (let i = 0; i < ring.length; i++) {
+              const [px, py] = proj.project(ring[i][0], ring[i][1]);
+              if (i === 0) {
+                path.moveTo(px, py);
+                lastPx = px;
+                lastPy = py;
+              } else if (i === ring.length - 1 || Math.abs(px - lastPx) > 0.45 || Math.abs(py - lastPy) > 0.45) {
+                // Penyederhanaan titik sub-piksel untuk mempercepat render GeoJSON resolusi tinggi
+                path.lineTo(px, py);
+                lastPx = px;
+                lastPy = py;
+              }
+
+              if (px < minBx) minBx = px;
+              if (py < minBy) minBy = py;
+              if (px > maxBx) maxBx = px;
+              if (py > maxBy) maxBy = py;
+            }
+            path.closePath();
+          }
+        }
+
+        let centroidXY = null;
+        const cLonLat = computeLargestRingCentroid(geom);
+        if (cLonLat) {
+          centroidXY = proj.project(cLonLat[0], cLonLat[1]);
+        }
+
+        state.preparedFeatures.push({
+          provName,
+          path,
+          minBx,
+          minBy,
+          maxBx,
+          maxBy,
+          boxArea: minBx < Infinity ? (maxBx - minBx) * (maxBy - minBy) : 0,
+          centroidXY
+        });
+      }
+    }
+
+    // =========================================================================
+    // FETCH PARALEL SUPER CEPAT + CACHE UNTUK SOURCE BMKG
+    // =========================================================================
+    const GEO_CACHE_NAME = 'bmkg-maritim-geojson-v1';
+
+    async function fetchJsonSmart(url, { useCache = false, timeoutMs = 9000 } = {}) {
+      // Cek Cache Storage browser terlebih dahulu untuk file GeoJSON besar
+      if (useCache && 'caches' in window) {
+        try {
+          const cache = await caches.open(GEO_CACHE_NAME);
+          const cachedRes = await cache.match(url);
+          if (cachedRes) {
+            const cachedData = await cachedRes.json();
+            if (cachedData && typeof cachedData === 'object') {
+              return { data: cachedData, via: 'Browser Cache' };
+            }
+          }
+        } catch (e) {
+          // Abaikan bila Cache API dibatasi iframe
+        }
+      }
+
+      const endpoints = [
+        { label: 'Direct BMKG', url, delayMs: 0 },
+        { label: 'Fast Proxy 1', url: `https://corsproxy.io/?url=${encodeURIComponent(url)}`, delayMs: 120 },
+        { label: 'Fast Proxy 2', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, delayMs: 180 },
+        { label: 'Fast Proxy 3', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, delayMs: 250 }
+      ];
+
+      const controllers = endpoints.map(() => new AbortController());
+
+      const tasks = endpoints.map((ep, idx) => new Promise(async (resolve, reject) => {
+        const ctrl = controllers[idx];
+        const timeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
+
+        try {
+          if (ep.delayMs > 0) {
+            await new Promise(r => setTimeout(r, ep.delayMs));
+            if (ctrl.signal.aborted) throw new Error('Aborted');
+          }
+          const res = await fetch(ep.url, {
+            signal: ctrl.signal,
+            cache: useCache ? 'force-cache' : 'no-store'
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (!data || typeof data !== 'object') throw new Error('Invalid JSON');
+          clearTimeout(timeoutId);
+          resolve({ data, via: ep.label });
+        } catch (err) {
+          clearTimeout(timeoutId);
+          reject(err);
+        }
+      }));
+
+      try {
+        const winner = await Promise.any(tasks);
+        // Batalkan request lain yang masih berjalan agar hemat bandwidth
+        controllers.forEach(c => c.abort());
+
+        if (useCache && 'caches' in window) {
+          try {
+            const cache = await caches.open(GEO_CACHE_NAME);
+            await cache.put(url, new Response(JSON.stringify(winner.data), {
+              headers: { 'Content-Type': 'application/json' }
+            }));
+          } catch (e) {
+            // Abaikan error penyimpanan cache
+          }
+        }
+        return winner;
+      } catch (aggErr) {
+        controllers.forEach(c => c.abort());
+        throw new Error(`Tidak dapat mengakses ${url}`);
+      }
+    }
+
+    async function loadAllBMKGData(forceRefresh = false) {
+      const badge = document.getElementById('statusBadge');
+      const iconReload = document.getElementById('iconReload');
+      iconReload.classList.add('fa-spin');
+      badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30';
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Memuat Source BMKG...';
+
+      let geoOk = false;
+      let robOk = false;
+
+      // Jalankan keduanya paralel, namun langsung render masing-masing begitu selesai (progresif!)
+      const robPromise = fetchJsonSmart(BMKG_BANJIRROB_URL, { useCache: false, timeoutMs: 8000 })
+        .then(res => {
+          state.rawRobJson = res.data;
+          state.normalizedByDate = parseBanjirRobJSON(state.rawRobJson);
+          const dates = Object.keys(state.normalizedByDate).sort();
+          state.robSourceLabel = dates.length > 0
+            ? `Aktif (${dates.length} hari: ${dates[0]} s/d ${dates[dates.length - 1]})`
+            : 'Aktif (Tidak ada peringatan rob aktif)';
+          document.getElementById('robStatusText').textContent = state.robSourceLabel;
+          robOk = true;
+
+          // Segera perbarui tabel & tanggal tanpa menunggu file GeoJSON besar selesai!
+          autoResolveDatesFromSource();
+          renderDaySummaryCards();
+          renderDocumentPreview();
+          scheduleCanvasRedraw();
+        })
+        .catch(() => {
+          state.normalizedByDate = {};
+          state.robSourceLabel = 'Gagal memuat banjirrob_combine.json dari server BMKG';
+          document.getElementById('robStatusText').textContent = state.robSourceLabel;
+        });
+
+      const geoPromise = fetchJsonSmart(BMKG_GEOJSON_URL, { useCache: !forceRefresh, timeoutMs: 14000 })
+        .then(res => {
+          state.geoJson = res.data;
+          prepareGeoFeatures(state.geoJson);
+          const count = (state.geoJson.features || []).length;
+          state.geoSourceLabel = `Aktif (${count} poligon provinsi • ${res.via})`;
+          document.getElementById('geoStatusText').textContent = state.geoSourceLabel;
+          geoOk = true;
+          scheduleCanvasRedraw();
+        })
+        .catch(() => {
+          state.geoSourceLabel = 'Gagal memuat indonesia-prov.geojson dari server BMKG';
+          document.getElementById('geoStatusText').textContent = state.geoSourceLabel;
+        });
+
+      await Promise.all([robPromise, geoPromise]);
+
+      iconReload.classList.remove('fa-spin');
+
+      if (geoOk && robOk) {
+        badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Source BMKG Aktif';
+        showToast('Data peta & potensi banjir rob berhasil dimuat.', 'success');
+      } else {
+        badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Gangguan Koneksi Source';
+        showToast('Sebagian source BMKG gagal dimuat. Klik "Muat Ulang Source BMKG" untuk mencoba kembali.', 'error');
+      }
+    }
+
+    function autoResolveDatesFromSource() {
+      const todayISO = toISODate(new Date());
+      state.baseDateISO = todayISO; // Tanggal tanda tangan selalu hari ini
+
+      const defaultH1 = addDaysISO(todayISO, 1);
+      const defaultH2 = addDaysISO(todayISO, 2);
+      const defaultH3 = addDaysISO(todayISO, 3);
+
+      const availableDates = Object.keys(state.normalizedByDate).sort();
+      const hasOverlapWithTodayH1ToH3 = [defaultH1, defaultH2, defaultH3].some(d => state.normalizedByDate[d]);
+
+      if (hasOverlapWithTodayH1ToH3 || availableDates.length === 0) {
+        state.startDateH1ISO = defaultH1;
+      } else {
+        const upcomingDates = availableDates.filter(d => d >= todayISO);
+        state.startDateH1ISO = upcomingDates.length > 0 ? upcomingDates[0] : availableDates[0];
+      }
+    }
+
+    // Calculate centroid of the largest exterior polygon ring (ensures island provinces put badge on main island)
+    function computeLargestRingCentroid(geometry) {
+      if (!geometry) return null;
+      let rings = [];
+      if (geometry.type === 'Polygon' && geometry.coordinates.length > 0) {
+        rings.push(geometry.coordinates[0]);
+      } else if (geometry.type === 'MultiPolygon') {
+        for (const poly of geometry.coordinates) {
+          if (poly && poly.length > 0) rings.push(poly[0]);
+        }
+      }
+      if (rings.length === 0) return null;
+
+      let bestCentroid = null;
+      let maxAbsArea = -1;
+
+      for (const ring of rings) {
+        let area = 0;
+        let cx = 0;
+        let cy = 0;
+        for (let i = 0, len = ring.length; i < len - 1; i++) {
+          const [x0, y0] = ring[i];
+          const [x1, y1] = ring[i + 1];
+          const cross = x0 * y1 - x1 * y0;
+          area += cross;
+          cx += (x0 + x1) * cross;
+          cy += (y0 + y1) * cross;
+        }
+        const absArea = Math.abs(area / 2);
+        if (absArea > maxAbsArea && absArea > 0) {
+          maxAbsArea = absArea;
+          bestCentroid = [cx / (3 * area), cy / (3 * area)];
+        }
+      }
+
+      if (!bestCentroid) {
+        const r0 = rings[0];
+        const sum = r0.reduce((acc, pt) => [acc[0] + pt[0], acc[1] + pt[1]], [0, 0]);
+        return [sum[0] / r0.length, sum[1] / r0.length];
+      }
+      return bestCentroid;
+    }
+
+    function drawRoundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawWarningBadge(ctx, x, y, size) {
+      ctx.save();
+      const half = size * 0.56;
+      const topY = y - size * 0.58;
+      const botY = y + size * 0.42;
+
+      ctx.shadowColor = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur = 7;
+      ctx.shadowOffsetY = 2;
+
+      ctx.beginPath();
+      ctx.moveTo(x, topY);
+      ctx.lineTo(x + half, botY);
+      ctx.lineTo(x - half, botY);
+      ctx.closePath();
+
+      const grad = ctx.createLinearGradient(x, topY, x, botY);
+      grad.addColorStop(0, '#fbbf24');
+      grad.addColorStop(1, '#ea580c');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.lineWidth = Math.max(2, size * 0.08);
+      ctx.strokeStyle = '#7c2d12';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `900 ${Math.round(size * 0.54)}px Inter, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('!', x, y + size * 0.04);
+
+      ctx.restore();
+    }
+
+    function renderSingleMapCanvas(dayIndex, dateISO) {
+      const canvas = document.getElementById(`mapCanvas${dayIndex}`);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+      const proj = createProjector(W, H);
+
+      const mapStyle = 'satellite';
+      const showDatePill = true;
+      const showInfoCard = true;
+      const showWarningIcon = true;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // 1. Ocean Bathymetry Base Gradient
+      const oceanGrad = ctx.createLinearGradient(0, 0, 0, H);
+      oceanGrad.addColorStop(0, '#063d5c');
+      oceanGrad.addColorStop(0.55, '#07486b');
+      oceanGrad.addColorStop(1, '#032942');
+      ctx.fillStyle = oceanGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. Esri Satellite Imagery Tiles
+      let drewSatellite = false;
+      if (mapStyle === 'satellite' && Object.keys(state.esriTilesCache).length > 0) {
+        const z = 5;
+        const n = Math.pow(2, z);
+        for (const [key, img] of Object.entries(state.esriTilesCache)) {
+          const [, tyStr, txStr] = key.split('/');
+          const tx = Number(txStr), ty = Number(tyStr);
+          const x0 = ((tx / n) - proj.minX) * proj.scale + proj.offsetX;
+          const y0 = ((ty / n) - proj.minY) * proj.scale + proj.offsetY;
+          const tileSize = (1 / n) * proj.scale;
+          try {
+            ctx.drawImage(img, x0, y0, tileSize + 0.8, tileSize + 0.8);
+            drewSatellite = true;
+          } catch (err) {
+            // Ignore broken tile
+          }
+        }
+      }
+
+      if (!drewSatellite) {
+        ctx.strokeStyle = 'rgba(148, 210, 245, 0.10)';
+        ctx.lineWidth = 1;
+        for (let lon = 95; lon <= 140; lon += 5) {
+          const [gx] = proj.project(lon, 0);
+          ctx.beginPath();
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, H);
+          ctx.stroke();
+        }
+        for (let lat = -10; lat <= 5; lat += 5) {
+          const [, gy] = proj.project(115, lat);
+          ctx.beginPath();
+          ctx.moveTo(0, gy);
+          ctx.lineTo(W, gy);
+          ctx.stroke();
+        }
+      }
+
+      const dayEvents = state.normalizedByDate[dateISO] || {};
+      const affectedProvs = new Set(Object.keys(dayEvents));
+      state.canvasHitBoxes[dayIndex] = [];
+
+      // 3. Render Poligon Provinsi menggunakan Path2D yang sudah dipre-kompilasi
+      const prepared = state.preparedFeatures || [];
+      const warningCentroids = new Map();
+
+      for (const item of prepared) {
+        const provName = item.provName;
+        const isAffected = provName && affectedProvs.has(provName);
+        const isSelected = provName && state.selectedProvPerCanvas[dayIndex] === provName;
+
+        if (isAffected) {
+          ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.85)' : 'rgba(234, 152, 28, 0.72)';
+          ctx.fill(item.path);
+          ctx.lineWidth = isSelected ? 2.8 : 1.9;
+          ctx.strokeStyle = isSelected ? '#ffffff' : '#f59e0b';
+          ctx.stroke(item.path);
+
+          if (item.minBx < Infinity) {
+            state.canvasHitBoxes[dayIndex].push({
+              prov: provName,
+              x1: item.minBx, y1: item.minBy, x2: item.maxBx, y2: item.maxBy
+            });
+          }
+
+          if (item.centroidXY) {
+            const [cx, cy] = item.centroidXY;
+            const prev = warningCentroids.get(provName);
+            if (!prev || item.boxArea > prev.areaWeight) {
+              warningCentroids.set(provName, { x: cx, y: cy, areaWeight: item.boxArea });
+            }
+          }
+        } else {
+          ctx.fillStyle = drewSatellite ? 'rgba(92, 118, 74, 0.28)' : '#5d774a';
+          ctx.fill(item.path);
+          ctx.lineWidth = 1.0;
+          ctx.strokeStyle = drewSatellite ? 'rgba(226, 232, 240, 0.45)' : 'rgba(226, 232, 240, 0.55)';
+          ctx.stroke(item.path);
+        }
+      }
+
+      // Indikator ringan pada peta jika poligon GeoJSON sedang diunduh pertama kali
+      if (prepared.length === 0) {
+        ctx.save();
+        drawRoundedRect(ctx, W / 2 - 140, H / 2 - 20, 280, 40, 10);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+        ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '600 13px Inter, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Memuat poligon peta provinsi BMKG...', W / 2, H / 2);
+        ctx.restore();
+      }
+
+      // 4. Draw Warning Triangle Icons on Top of Affected Provinces
+      if (showWarningIcon) {
+        for (const [, pos] of warningCentroids.entries()) {
+          drawWarningBadge(ctx, pos.x, pos.y, 34);
+        }
+      }
+
+      // 5. Top-Left Zoom Button Decoration
+      if (showInfoCard) {
+        ctx.save();
+        drawRoundedRect(ctx, 22, 20, 38, 72, 6);
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.22)';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(22, 56);
+        ctx.lineTo(60, 56);
+        ctx.stroke();
+
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 22px Inter, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('+', 41, 38);
+        ctx.fillText('−', 41, 74);
+        ctx.restore();
+      }
+
+      // 6. Top-Right Info Card
+      if (showInfoCard) {
+        const selectedProv = state.selectedProvPerCanvas[dayIndex] && affectedProvs.has(state.selectedProvPerCanvas[dayIndex])
+          ? state.selectedProvPerCanvas[dayIndex]
+          : null;
+
+        const cardW = 315;
+        const cardH = selectedProv ? 156 : 168;
+        const cardX = W - cardW - 24;
+        const cardY = 22;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.25)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 3;
+        drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 14);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+
+        let curY = cardY + 26;
+        ctx.textAlign = 'left';
+
+        if (selectedProv) {
+          ctx.fillStyle = '#0f122a';
+          ctx.font = '700 18px Inter, Arial, sans-serif';
+          ctx.fillText(selectedProv, cardX + 20, curY);
+          curY += 26;
+        }
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 13px Inter, Arial, sans-serif';
+        ctx.fillText('Periode', cardX + 20, curY);
+        curY += 22;
+
+        ctx.fillStyle = '#9a3412';
+        ctx.font = '700 16px Inter, Arial, sans-serif';
+        ctx.fillText(formatIndonesianDate(dateISO, false), cardX + 20, curY);
+        curY += 18;
+
+        if (!selectedProv) {
+          drawRoundedRect(ctx, cardX + 20, curY, cardW - 40, 32, 8);
+          ctx.fillStyle = '#fff7ed';
+          ctx.fill();
+          ctx.fillStyle = '#9a3412';
+          ctx.font = '500 12.5px Inter, Arial, sans-serif';
+          ctx.textAlign = 'center';
+          const statusMsg = affectedProvs.size > 0
+            ? 'Pilih wilayah pada peta terlebih dahulu'
+            : 'Tidak ada potensi banjir rob';
+          ctx.fillText(statusMsg, cardX + cardW / 2, curY + 20);
+          curY += 40;
+        } else {
+          curY += 8;
+        }
+
+        drawRoundedRect(ctx, cardX + 20, curY, cardW - 40, 36, 8);
+        ctx.fillStyle = selectedProv ? '#d97706' : '#e6ae65';
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 13.5px Inter, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Lihat Wilayah', cardX + cardW / 2, curY + 23);
+
+        ctx.restore();
+      }
+
+      // 7. Bottom-Center Date Pill
+      if (showDatePill) {
+        const fullDateLabel = formatIndonesianDate(dateISO, true);
+        const pillW = 300;
+        const pillH = 42;
+        const pillX = (W - pillW) / 2;
+        const pillY = H - pillH - 16;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.28)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 2;
+        drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 11);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+
+        ctx.fillStyle = '#d97706';
+        ctx.font = '700 15px Inter, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('‹', pillX + 22, pillY + pillH / 2);
+        ctx.fillText('›', pillX + pillW - 22, pillY + pillH / 2);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '600 14.5px Inter, Arial, sans-serif';
+        ctx.fillText(fullDateLabel, W / 2, pillY + pillH / 2 + 1);
+        ctx.restore();
+      }
+
+      // 8. Bottom-Right Attribution Tag
+      ctx.save();
+      const attrText = drewSatellite ? 'Leaflet | Imagery © Esri' : 'BMKG Maritim | Peta Indonesia';
+      ctx.font = '500 11px Inter, Arial, sans-serif';
+      const tw = ctx.measureText(attrText).width + 16;
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.fillRect(W - tw, H - 20, tw, 20);
+      ctx.fillStyle = '#334155';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(attrText, W - 8, H - 10);
+      ctx.restore();
+    }
+
+    function getThreeDatesISO() {
+      const h1 = state.startDateH1ISO || addDaysISO(toISODate(new Date()), 1);
+      return [h1, addDaysISO(h1, 1), addDaysISO(h1, 2)];
+    }
+
+    function renderAllCanvases() {
+      const dates = getThreeDatesISO();
+      for (let i = 0; i < 3; i++) {
+        renderSingleMapCanvas(i, dates[i]);
+      }
+    }
+
+    // =========================================================================
+    // PEMBANGUNAN DATA TABEL & PRATINJAU A4 HALAMAN 1 & 2
+    // =========================================================================
+    function buildThreeDayTableData() {
+      const dates = getThreeDatesISO();
+      const autoPrefix = true;
+
+      // Gather union of provinces active across the 3 days in clean order
+      const provSet = new Set();
+      for (const dt of dates) {
+        const dayObj = state.normalizedByDate[dt] || {};
+        for (const p of Object.keys(dayObj)) {
+          provSet.add(p);
+        }
+      }
+
+      const rows = [];
+      for (const prov of provSet) {
+        const cells = dates.map(dt => {
+          const provData = (state.normalizedByDate[dt] || {})[prov];
+          if (!provData) return [];
+          const lines = [];
+          for (const [kab, pesArr] of Object.entries(provData)) {
+            const formattedPes = (pesArr || [])
+              .map(item => formatPesisirItem(item, autoPrefix))
+              .filter(Boolean);
+
+            if (kab === '_umum_' || !kab) {
+              if (formattedPes.length > 0) lines.push(formattedPes.join(', '));
+            } else if (formattedPes.length > 0) {
+              lines.push(`${kab}: ${formattedPes.join(', ')}`);
+            } else {
+              lines.push(kab);
+            }
+          }
+          return lines;
+        });
+
+        rows.push({ prov, cells });
+      }
+      return { dates, rows };
+    }
+
+    function renderDaySummaryCards() {
+      const dates = getThreeDatesISO();
+      const grid = document.getElementById('daySummaryGrid');
+      grid.innerHTML = dates.map((dt, idx) => {
+        const count = Object.keys(state.normalizedByDate[dt] || {}).length;
+        const badgeColor = count > 0
+          ? 'bg-amber-50 border-amber-200 text-amber-900'
+          : 'bg-slate-50 border-slate-200 text-slate-500';
+        return `
+          <div class="rounded-xl border p-2 text-center ${badgeColor}">
+            <div class="text-[10px] font-bold uppercase tracking-wider opacity-75">H+${idx + 1}</div>
+            <div class="text-[11px] font-bold truncate mt-0.5">${formatIndonesianDate(dt, false)}</div>
+            <div class="text-[10.5px] mt-0.5 font-medium">${count} Provinsi</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDocumentPreview() {
+      const { dates, rows } = buildThreeDayTableData();
+
+      // Page 1 metadata
+      const docNo = document.getElementById('inputDocNumber').value.trim();
+      document.getElementById('previewDocNo').textContent = docNo ? `No: ${docNo}` : 'No:';
+      document.getElementById('previewValidRange').textContent =
+        `Berlaku Tanggal ${formatIndonesianDate(dates[0], false)} - ${formatIndonesianDate(dates[2], false)}`;
+
+      // Page 2 Table Headers
+      document.getElementById('thDay0').textContent = formatIndonesianDate(dates[0], false);
+      document.getElementById('thDay1').textContent = formatIndonesianDate(dates[1], false);
+      document.getElementById('thDay2').textContent = formatIndonesianDate(dates[2], false);
+
+      // Page 2 Table Rows
+      const tbody = document.getElementById('previewTableBody');
+      if (rows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="text-center py-6 text-gray-500 italic">
+              Tidak terdapat wilayah potensi banjir pesisir (rob) pada periode ${formatIndonesianDate(dates[0], false)} s/d ${formatIndonesianDate(dates[2], false)}.
+            </td>
+          </tr>
+        `;
+      } else {
+        tbody.innerHTML = rows.map(row => {
+          const tds = row.cells.map(lines => {
+            if (!lines || lines.length === 0) return '<td></td>';
+            const htmlLines = lines.map(line => {
+              const colonIdx = line.indexOf(':');
+              if (colonIdx > -1) {
+                const kab = escapeHtml(line.slice(0, colonIdx + 1));
+                const rest = escapeHtml(line.slice(colonIdx + 1));
+                return `<div class="mb-2 last:mb-0 text-[#374151]"><strong class="font-bold text-[#111827]">${kab}</strong>${rest}</div>`;
+              }
+              return `<div class="mb-2 last:mb-0 text-[#374151]">${escapeHtml(line)}</div>`;
+            }).join('');
+            return `<td>${htmlLines}</td>`;
+          }).join('');
+
+          return `
+            <tr>
+              <td><span class="bmkg-prov-name">${escapeHtml(row.prov)}</span></td>
+              ${tds}
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Page 2 Himbauan Resmi (Otomatis sesuai Template) & Signature
+      document.getElementById('previewHimbauan1').textContent = OFFICIAL_HIMBAUAN[0];
+      document.getElementById('previewHimbauan2').textContent = OFFICIAL_HIMBAUAN[1];
+      document.getElementById('previewHimbauan3').textContent = OFFICIAL_HIMBAUAN[2];
+
+      const city = document.getElementById('inputSignCity').value.trim() || 'Jakarta';
+      const unit = document.getElementById('inputSignUnit').value.trim() || 'Direktorat Meteorologi Maritim';
+      document.getElementById('previewSignDate').textContent = `${city}, ${formatIndonesianDate(state.baseDateISO, false)}`;
+      document.getElementById('previewSignUnit').textContent = unit;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderEverything() {
+      renderDaySummaryCards();
+      renderDocumentPreview();
+      renderAllCanvases();
+    }
+
+    // =========================================================================
+    // EKSPOR KE FORMAT PDF RESMI (VEKTOR + HIGH-RES MAP CANVAS)
+    // =========================================================================
+    async function generateOfficialPDF() {
+      const btn = document.getElementById('btnDownloadPdf');
+      const textBtn = document.getElementById('textPdfBtn');
+      const iconPdf = document.getElementById('iconPdf');
+
+      btn.disabled = true;
+      iconPdf.className = 'fa-solid fa-spinner fa-spin';
+      textBtn.textContent = 'Menyusun PDF...';
+
+      try {
+        // Ensure canvases are freshly rendered
+        renderAllCanvases();
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+          compress: true
+        });
+
+        const pageW = 210;
+        const pageH = 297;
+        const marginX = 14;
+        const contentW = pageW - marginX * 2;
+        const { dates, rows } = buildThreeDayTableData();
+
+        // ---------------- PAGE 1: KOP SURAT + JUDUL + 3 PETA ----------------
+        const logoCanvas = document.getElementById('kopLogoCanvas');
+        const logoDataUrl = logoCanvas.toDataURL('image/png');
+        doc.addImage(logoDataUrl, 'PNG', marginX, 9, 18, 18);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(0, 0, 0);
+        doc.text('THE AGENCY FOR METEOROLOGY, CLIMATOLOGY, AND', pageW / 2 + 6, 13.5, { align: 'center' });
+        doc.text('GEOPHYSICS OF THE REPUBLIC OF INDONESIA (BMKG)', pageW / 2 + 6, 18, { align: 'center' });
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('Jl. Angkasa I No. 2, Jakarta 10610 Telp: (021) 4246321 Fax: (021) 4246703', pageW / 2 + 6, 22.5, { align: 'center' });
+        doc.text('P. O. BOX 3540 JKT, Website: http://www.bmkg.go.id', pageW / 2 + 6, 26.2, { align: 'center' });
+
+        // Garis Kop Surat
+        doc.setLineWidth(0.7);
+        doc.setDrawColor(0, 0, 0);
+        doc.line(marginX, 29.2, pageW - marginX, 29.2);
+        doc.setLineWidth(0.2);
+        doc.line(marginX, 30.1, pageW - marginX, 30.1);
+
+        // Judul Informasi
+        let curY = 35.5;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('INFORMASI POTENSI BANJIR PESISIR (ROB)', pageW / 2, curY, { align: 'center' });
+
+        curY += 4.6;
+        doc.setFontSize(10);
+        doc.text('Wilayah Indonesia', pageW / 2, curY, { align: 'center' });
+
+        const docNo = document.getElementById('inputDocNumber').value.trim();
+        curY += 4.5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(docNo ? `No: ${docNo}` : 'No:', pageW / 2, curY, { align: 'center' });
+
+        curY += 4.5;
+        doc.setFont('helvetica', 'bold');
+        doc.text(
+          `Berlaku Tanggal ${formatIndonesianDate(dates[0], false)} - ${formatIndonesianDate(dates[2], false)}`,
+          pageW / 2,
+          curY,
+          { align: 'center' }
+        );
+
+        // 3 Canvas Peta Indonesia
+        curY += 4.5;
+        const mapW = contentW; // 182 mm
+        const mapH = 72.5;
+
+        for (let i = 0; i < 3; i++) {
+          const cnv = document.getElementById(`mapCanvas${i}`);
+          const imgData = cnv.toDataURL('image/jpeg', 0.94);
+          doc.addImage(imgData, 'JPEG', marginX, curY, mapW, mapH);
+
+          // Thin clean border around each map canvas
+          doc.setDrawColor(180, 190, 200);
+          doc.setLineWidth(0.25);
+          doc.rect(marginX, curY, mapW, mapH);
+
+          curY += mapH + 3.2;
+        }
+
+        // ---------------- PAGE 2+: TABEL WILAYAH + HIMBAUAN + TTD ----------------
+        doc.addPage();
+
+        const tableHead = [[
+          'Provinsi',
+          formatIndonesianDate(dates[0], false),
+          formatIndonesianDate(dates[1], false),
+          formatIndonesianDate(dates[2], false)
+        ]];
+
+        // Kumpulan prefix "Kabupaten/Kota:" per baris untuk pewarnaan & cetak tebal presisi di PDF
+        const rowKabPrefixes = rows.map(r => {
+          const prefixes = new Set();
+          r.cells.forEach(lines => {
+            (lines || []).forEach(line => {
+              const idx = line.indexOf(':');
+              if (idx > 0) prefixes.add(line.slice(0, idx + 1));
+            });
+          });
+          return prefixes;
+        });
+
+        const hasDataRows = rows.length > 0;
+        const tableBody = hasDataRows
+          ? rows.map(r => [
+              r.prov,
+              r.cells[0].join('\n\n'),
+              r.cells[1].join('\n\n'),
+              r.cells[2].join('\n\n')
+            ])
+          : [[
+              {
+                content: `Tidak terdapat potensi banjir pesisir (rob) pada periode ${formatIndonesianDate(dates[0], false)} - ${formatIndonesianDate(dates[2], false)}.`,
+                colSpan: 4,
+                styles: { halign: 'center', fontStyle: 'italic', textColor: [107, 114, 128] }
+              }
+            ]];
+
+        doc.setLineHeightFactor(1.35);
+
+        doc.autoTable({
+          startY: 16,
+          margin: { left: marginX, right: marginX, bottom: 20 },
+          head: tableHead,
+          body: tableBody,
+          theme: 'grid',
+          styles: {
+            font: 'helvetica',
+            fontSize: 8.3,
+            cellPadding: { top: 3.2, right: 4.2, bottom: 3.2, left: 3.4 },
+            textColor: [55, 65, 81],
+            fillColor: [255, 255, 255],
+            lineColor: [229, 231, 235],
+            lineWidth: 0.2,
+            valign: 'top',
+            overflow: 'linebreak'
+          },
+          headStyles: {
+            fillColor: [213, 115, 12],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 8.8,
+            halign: 'left',
+            valign: 'middle',
+            lineWidth: 0,
+            cellPadding: { top: 3.2, right: 3.4, bottom: 3.2, left: 3.4 }
+          },
+          columnStyles: {
+            0: { cellWidth: 30, fontStyle: 'bold', textColor: [198, 93, 12] },
+            1: { cellWidth: (contentW - 30) / 3 },
+            2: { cellWidth: (contentW - 30) / 3 },
+            3: { cellWidth: (contentW - 30) / 3 }
+          },
+          willDrawCell: function (data) {
+            if (data.section === 'body' && hasDataRows) {
+              data.cell._customLines = Array.isArray(data.cell.text) ? [...data.cell.text] : [];
+              data.cell.text = [];
+            }
+          },
+          didDrawCell: function (data) {
+            // Sudut membulat halus pada ujung kiri-atas dan kanan-atas header oranye
+            if (data.section === 'head' && (data.column.index === 0 || data.column.index === 3)) {
+              doc.setFillColor(255, 255, 255);
+              if (data.column.index === 0) {
+                doc.triangle(data.cell.x, data.cell.y, data.cell.x + 1.4, data.cell.y, data.cell.x, data.cell.y + 1.4, 'F');
+              } else {
+                const rx = data.cell.x + data.cell.width;
+                doc.triangle(rx, data.cell.y, rx - 1.4, data.cell.y, rx, data.cell.y + 1.4, 'F');
+              }
+            }
+
+            if (data.section !== 'body' || !hasDataRows) return;
+            const lines = data.cell._customLines || [];
+            if (lines.length === 0) return;
+
+            const padLeft = typeof data.cell.padding === 'function' ? data.cell.padding('left') : 3.4;
+            const padTop = typeof data.cell.padding === 'function' ? data.cell.padding('top') : 3.2;
+            const fontSizePt = data.cell.styles.fontSize || 8.3;
+            const fontSizeMm = fontSizePt * (25.4 / 72);
+            const lineStep = fontSizeMm * 1.35;
+
+            const startX = data.cell.x + padLeft;
+            let curTextY = data.cell.y + padTop + fontSizeMm * 0.82;
+
+            if (data.column.index === 0) {
+              // Kolom Provinsi: Teks Oranye Tebal + Garis Bawah (Underline)
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(fontSizePt);
+              doc.setTextColor(198, 93, 12);
+              doc.setDrawColor(198, 93, 12);
+              doc.setLineWidth(0.22);
+
+              for (const line of lines) {
+                if (!line) continue;
+                doc.text(line, startX, curTextY);
+                const tw = doc.getTextWidth(line);
+                doc.line(startX, curTextY + 0.65, startX + tw, curTextY + 0.65);
+                curTextY += lineStep;
+              }
+            } else {
+              // Kolom Tanggal: Nama Kabupaten/Kota Tebal Hitam + Daftar Pesisir Abu-abu Tua
+              const prefixes = rowKabPrefixes[data.row.index] || new Set();
+              doc.setFontSize(fontSizePt);
+
+              for (const line of lines) {
+                if (line.trim() === '') {
+                  curTextY += lineStep * 0.52;
+                  continue;
+                }
+
+                let matchedPrefix = null;
+                const colonIdx = line.indexOf(':');
+                if (colonIdx > 0) {
+                  const candidate = line.slice(0, colonIdx + 1);
+                  if (prefixes.has(candidate)) {
+                    matchedPrefix = candidate;
+                  }
+                }
+
+                if (matchedPrefix) {
+                  const restText = line.slice(matchedPrefix.length);
+                  doc.setFont('helvetica', 'bold');
+                  doc.setTextColor(17, 24, 39);
+                  doc.text(matchedPrefix, startX, curTextY);
+                  const prefixW = doc.getTextWidth(matchedPrefix);
+
+                  if (restText) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(55, 65, 81);
+                    doc.text(restText, startX + prefixW, curTextY);
+                  }
+                } else {
+                  doc.setFont('helvetica', 'normal');
+                  doc.setTextColor(55, 65, 81);
+                  doc.text(line, startX, curTextY);
+                }
+
+                curTextY += lineStep;
+              }
+            }
+          }
+        });
+
+        doc.setLineHeightFactor(1.15);
+
+        let afterTableY = doc.lastAutoTable.finalY + 8;
+
+        // Check if Himbauan + Signature fits on current page; if not, add new page
+        const [p1, p2, p3] = OFFICIAL_HIMBAUAN;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.setTextColor(0, 0, 0);
+
+        const lines1 = doc.splitTextToSize(p1, contentW);
+        const lines2 = doc.splitTextToSize(p2, contentW);
+        const lines3 = doc.splitTextToSize(p3, contentW);
+
+        const neededHeight = (lines1.length + lines2.length + lines3.length) * 4.6 + 38;
+        if (afterTableY + neededHeight > pageH - 18) {
+          doc.addPage();
+          afterTableY = 20;
+        }
+
+        const writeParagraph = (linesArr) => {
+          if (!linesArr.length) return;
+          doc.text(linesArr, marginX, afterTableY, { maxWidth: contentW, align: 'justify' });
+          afterTableY += linesArr.length * 4.5 + 3.5;
+        };
+
+        writeParagraph(lines1);
+        writeParagraph(lines2);
+        writeParagraph(lines3);
+
+        // Signature Block (Bottom Right)
+        afterTableY += 5;
+        const signX = pageW - marginX - 62;
+        const city = document.getElementById('inputSignCity').value.trim() || 'Jakarta';
+        const unit = document.getElementById('inputSignUnit').value.trim() || 'Direktorat Meteorologi Maritim';
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.text(`${city}, ${formatIndonesianDate(state.baseDateISO, false)}`, signX, afterTableY);
+        afterTableY += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text(unit, signX, afterTableY);
+
+        // Add Page Numbers on Page 2+ ("- 2 -", "- 3 -", ...)
+        const totalPages = doc.getNumberOfPages();
+        for (let p = 2; p <= totalPages; p++) {
+          doc.setPage(p);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(75, 85, 99);
+          doc.text(`- ${p} -`, pageW / 2, pageH - 10, { align: 'center' });
+        }
+
+        const fileName = `Informasi_Potensi_Banjir_Pesisir_BMKG_${dates[0]}_sd_${dates[2]}.pdf`;
+        doc.save(fileName);
+        showToast(`PDF "${fileName}" berhasil dibuat dan diunduh!`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast(`Terjadi kesalahan saat membuat PDF: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        iconPdf.className = 'fa-solid fa-file-pdf';
+        textBtn.textContent = 'Download PDF';
+      }
+    }
+
+    // =========================================================================
+    // EVENT LISTENERS & INISIALISASI APLIKASI
+    // =========================================================================
+    function setupEventListeners() {
+      // Reload langsung dari Source API BMKG (bypass cache agar mengambil data terbaru)
+      document.getElementById('btnReloadApi').addEventListener('click', () => loadAllBMKGData(true));
+
+      // Download PDF (Header & Sidebar button)
+      document.getElementById('btnDownloadPdf').addEventListener('click', generateOfficialPDF);
+      document.getElementById('btnDownloadPdfSide').addEventListener('click', generateOfficialPDF);
+
+      // Hanya 3 input yang tersedia: Nomor Surat, Kota, dan Unit Penandatangan
+      const allowedInputs = ['inputDocNumber', 'inputSignCity', 'inputSignUnit'];
+      allowedInputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', renderDocumentPreview);
+      });
+
+      // Klik interaktif pada 3 Canvas Peta untuk highlight kartu wilayah pada PDF
+      for (let idx = 0; idx < 3; idx++) {
+        const cnv = document.getElementById(`mapCanvas${idx}`);
+        cnv.addEventListener('click', (e) => {
+          const rect = cnv.getBoundingClientRect();
+          const scaleX = cnv.width / rect.width;
+          const scaleY = cnv.height / rect.height;
+          const x = (e.clientX - rect.left) * scaleX;
+          const y = (e.clientY - rect.top) * scaleY;
+
+          const boxes = state.canvasHitBoxes[idx] || [];
+          let hit = null;
+          for (const b of boxes) {
+            if (x >= b.x1 && x <= b.x2 && y >= b.y1 && y <= b.y2) {
+              hit = b.prov;
+              break;
+            }
+          }
+          state.selectedProvPerCanvas[idx] = (state.selectedProvPerCanvas[idx] === hit) ? null : hit;
+          renderSingleMapCanvas(idx, getThreeDatesISO()[idx]);
+        });
+      }
+
+      // Preview Zoom Buttons
+      document.querySelectorAll('.zoom-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const z = Number(btn.dataset.zoom);
+          state.zoomLevel = z;
+          document.querySelectorAll('.zoom-btn').forEach(b => {
+            b.className = 'zoom-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700';
+          });
+          btn.className = 'zoom-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-600 text-white';
+
+          ['a4Page1', 'a4Page2'].forEach(id => {
+            const sheet = document.getElementById(id);
+            sheet.style.transform = `scale(${z})`;
+            sheet.style.marginBottom = z < 1 ? `${(z - 1) * 1123}px` : '0px';
+          });
+        });
+      });
+    }
+
+    // Boot Application on Window Load
+    window.onload = function () {
+      try {
+        drawBMKGLogo(document.getElementById('navLogoCanvas'));
+        drawBMKGLogo(document.getElementById('kopLogoCanvas'));
+
+        const todayISO = toISODate(new Date());
+        state.baseDateISO = todayISO;
+        state.startDateH1ISO = addDaysISO(todayISO, 1);
+
+        setupEventListeners();
+        renderEverything(); // Tampilkan kerangka dokumen seketika tanpa menunggu jaringan
+        preloadEsriSatelliteTiles();
+        loadAllBMKGData(false);
+      } catch (err) {
+        console.error('Initialization error:', err);
+        showToast(`Gagal menginisialisasi halaman: ${err.message}`, 'error');
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,5 +1,29 @@
-# Vue 3 + TypeScript + Vite
+# BMKG Maritim — Generator PDF Banjir Pesisir (Rob)
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 + Vite + TypeScript + Tailwind port of `generator_pdf_banjir_rob_bmkg.html`.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## Features
+
+- Live A4 preview (kop surat, 3 peta H+1..H+3, tabel wilayah, himbauan, TTD)
+- Fetch otomatis `banjirrob_combine.json` & `indonesia-prov.geojson` dari BMKG
+- Vite proxy `/api/bmkg/*` (tanpa CORS proxy publik di jalur utama)
+- Download PDF resmi via jsPDF + autoTable
+
+## Setup
+
+```bash
+npm install
+npm run dev
+```
+
+Buka http://localhost:5173
+
+## Scripts
+
+- `npm run dev` — development server + BMKG proxy
+- `npm run build` — production build
+- `npm run preview` — preview build (proxy tetap aktif)
+
+## Catatan
+
+File HTML asli `generator_pdf_banjir_rob_bmkg.html` disimpan sebagai referensi.
