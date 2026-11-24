@@ -54,7 +54,7 @@ const daySummaries = computed(() => {
             id="inputDocNumber"
             v-model="docNumber"
             type="text"
-            placeholder="Contoh: B/ME.01.02/019/DMM/XI/BMKG-2026"
+            placeholder="B/ME.01.02/PDBP/(Nomor Produk)/(UPT)/(Bulan Romawi)/(Tahun)"
             class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
           />
         </div>
