@@ -33,6 +33,68 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Kop surat BMKG — sized to the official letterhead at A4 width (794px) */
+.kop-surat {
+  position: relative;
+  height: 123px;
+  background: #a9a9a9;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+}
+
+.kop-surat::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: linear-gradient(to bottom, #000 0 1px, #a9a9a9 1px 2px, #000 2px 5px);
+}
+
+.kop-logo {
+  position: absolute;
+  left: 42px;
+  top: 13px;
+  width: 68px;
+  height: 86px;
+  object-fit: contain;
+}
+
+.kop-copy {
+  padding-top: 15px;
+  padding-left: 100px;
+  padding-right: 6px;
+  text-align: center;
+}
+
+.kop-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 21.5px;
+  line-height: 26px;
+  letter-spacing: 0.15px;
+}
+
+.kop-addr {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.kop-web {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.kop-web span {
+  color: #0000ff;
+}
+
 .bmkg-table-wrap {
   border: 1px solid #e5e7eb;
   border-radius: 8px 8px 0 0;

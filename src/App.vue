@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import AuthGate from '@/components/AuthGate.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import SidebarForm from '@/components/SidebarForm.vue'
 import PreviewToolbar from '@/components/PreviewToolbar.vue'
@@ -30,6 +31,15 @@ import type {
 } from '@/lib/types'
 
 const { toasts, showToast } = useToasts()
+
+const AUTH_KEY = 'bmkg-rob-auth'
+const isAuthenticated = ref(sessionStorage.getItem(AUTH_KEY) === '1')
+
+function onAuthenticated() {
+  isAuthenticated.value = true
+  preloadEsriSatelliteTiles(esriTilesCache, () => scheduleCanvasRedraw())
+  loadAllBMKGData(false)
+}
 
 const docNumber = ref('')
 const signCity = ref('Jakarta')
@@ -231,7 +241,6 @@ async function onDownloadPdf() {
       startDateH1ISO: startDateH1ISO.value,
       normalizedByDate: normalizedByDate.value,
       mapCanvases: page1Ref.value?.getMapCanvases?.() || [],
-      logoCanvas: page1Ref.value?.getLogoCanvas?.() || null,
     })
     showToast(`PDF "${fileName}" berhasil dibuat dan diunduh!`, 'success')
   } catch (err) {
@@ -250,13 +259,16 @@ watch(
 )
 
 onMounted(() => {
+  if (!isAuthenticated.value) return
   preloadEsriSatelliteTiles(esriTilesCache, () => scheduleCanvasRedraw())
   loadAllBMKGData(false)
 })
 </script>
 
 <template>
-  <div class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+  <AuthGate v-if="!isAuthenticated" @authenticated="onAuthenticated" />
+
+  <div v-else class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
     <ToastStack :toasts="toasts" />
 
     <AppHeader
@@ -290,6 +302,7 @@ onMounted(() => {
             ref="page1Ref"
             :doc-number="docNumber"
             :valid-range-text="validRangeText"
+            :map-day-labels="dayHeaders"
             :zoom-level="zoomLevel"
             @map-click="onMapClick"
             @ready="renderAllCanvases"

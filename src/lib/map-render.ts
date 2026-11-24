@@ -1,4 +1,3 @@
-import { formatIndonesianDate } from './dates'
 import { createProjector, computeLargestRingCentroid } from './map-projection'
 import { getFeatureProvinceName } from './provinces'
 import type {
@@ -51,18 +50,18 @@ export function drawWarningBadge(
   ctx.closePath()
 
   const grad = ctx.createLinearGradient(x, topY, x, botY)
-  grad.addColorStop(0, '#fbbf24')
-  grad.addColorStop(1, '#ea580c')
+  grad.addColorStop(0, '#ffb020')
+  grad.addColorStop(1, '#e07000')
   ctx.fillStyle = grad
   ctx.fill()
 
   ctx.shadowColor = 'transparent'
   ctx.lineWidth = Math.max(2, size * 0.08)
-  ctx.strokeStyle = '#7c2d12'
+  ctx.strokeStyle = '#ffffff'
   ctx.lineJoin = 'round'
   ctx.stroke()
 
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = '#1a1a1a'
   ctx.font = `900 ${Math.round(size * 0.54)}px Inter, Arial, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -270,12 +269,13 @@ export function renderSingleMapCanvas(ctxIn: MapRenderContext): HitBox[] {
     const isSelected = !!(provName && selectedProv === provName)
 
     if (isAffected) {
+      // Match BMKG maritim orange highlight (amber-gold, semi-transparent)
       ctx.fillStyle = isSelected
-        ? 'rgba(245, 158, 11, 0.85)'
-        : 'rgba(234, 152, 28, 0.72)'
+        ? 'rgba(212, 140, 20, 0.78)'
+        : 'rgba(212, 160, 23, 0.58)'
       ctx.fill(item.path)
-      ctx.lineWidth = isSelected ? 2.8 : 1.9
-      ctx.strokeStyle = isSelected ? '#ffffff' : '#f59e0b'
+      ctx.lineWidth = isSelected ? 2.8 : 1.7
+      ctx.strokeStyle = isSelected ? '#ffffff' : '#c07000'
       ctx.stroke(item.path)
 
       if (item.minBx < Infinity && provName) {
@@ -347,99 +347,6 @@ export function renderSingleMapCanvas(ctxIn: MapRenderContext): HitBox[] {
   ctx.fillText('+', 41, 38)
   ctx.fillText('−', 41, 74)
   ctx.restore()
-
-  {
-    const activeSelected =
-      selectedProv && affectedProvs.has(selectedProv) ? selectedProv : null
-    const cardW = 315
-    const cardH = activeSelected ? 156 : 168
-    const cardX = W - cardW - 24
-    const cardY = 22
-
-    ctx.save()
-    ctx.shadowColor = 'rgba(0,0,0,0.25)'
-    ctx.shadowBlur = 12
-    ctx.shadowOffsetY = 3
-    drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 14)
-    ctx.fillStyle = '#ffffff'
-    ctx.fill()
-    ctx.shadowColor = 'transparent'
-
-    let curY = cardY + 26
-    ctx.textAlign = 'left'
-
-    if (activeSelected) {
-      ctx.fillStyle = '#0f122a'
-      ctx.font = '700 18px Inter, Arial, sans-serif'
-      ctx.fillText(activeSelected, cardX + 20, curY)
-      curY += 26
-    }
-
-    ctx.fillStyle = '#64748b'
-    ctx.font = '500 13px Inter, Arial, sans-serif'
-    ctx.fillText('Periode', cardX + 20, curY)
-    curY += 22
-
-    ctx.fillStyle = '#9a3412'
-    ctx.font = '700 16px Inter, Arial, sans-serif'
-    ctx.fillText(formatIndonesianDate(dateISO, false), cardX + 20, curY)
-    curY += 18
-
-    if (!activeSelected) {
-      drawRoundedRect(ctx, cardX + 20, curY, cardW - 40, 32, 8)
-      ctx.fillStyle = '#fff7ed'
-      ctx.fill()
-      ctx.fillStyle = '#9a3412'
-      ctx.font = '500 12.5px Inter, Arial, sans-serif'
-      ctx.textAlign = 'center'
-      const statusMsg =
-        affectedProvs.size > 0
-          ? 'Pilih wilayah pada peta terlebih dahulu'
-          : 'Tidak ada potensi banjir rob'
-      ctx.fillText(statusMsg, cardX + cardW / 2, curY + 20)
-      curY += 40
-    } else {
-      curY += 8
-    }
-
-    drawRoundedRect(ctx, cardX + 20, curY, cardW - 40, 36, 8)
-    ctx.fillStyle = activeSelected ? '#d97706' : '#e6ae65'
-    ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '700 13.5px Inter, Arial, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('Lihat Wilayah', cardX + cardW / 2, curY + 23)
-    ctx.restore()
-  }
-
-  {
-    const fullDateLabel = formatIndonesianDate(dateISO, true)
-    const pillW = 300
-    const pillH = 42
-    const pillX = (W - pillW) / 2
-    const pillY = H - pillH - 16
-
-    ctx.save()
-    ctx.shadowColor = 'rgba(0,0,0,0.28)'
-    ctx.shadowBlur = 10
-    ctx.shadowOffsetY = 2
-    drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 11)
-    ctx.fillStyle = '#ffffff'
-    ctx.fill()
-    ctx.shadowColor = 'transparent'
-
-    ctx.fillStyle = '#d97706'
-    ctx.font = '700 15px Inter, Arial, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('‹', pillX + 22, pillY + pillH / 2)
-    ctx.fillText('›', pillX + pillW - 22, pillY + pillH / 2)
-
-    ctx.fillStyle = '#1e293b'
-    ctx.font = '600 14.5px Inter, Arial, sans-serif'
-    ctx.fillText(fullDateLabel, W / 2, pillY + pillH / 2 + 1)
-    ctx.restore()
-  }
 
   ctx.save()
   const attrText = drewSatellite

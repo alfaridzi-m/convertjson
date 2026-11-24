@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { drawBMKGLogo } from '@/lib/draw-logo'
+import { LOGO_SRC } from '@/lib/draw-logo'
 
 defineProps<{
   status: 'idle' | 'loading' | 'ready' | 'error'
@@ -11,12 +10,6 @@ const emit = defineEmits<{
   reload: []
   download: []
 }>()
-
-const navLogoCanvas = ref<HTMLCanvasElement | null>(null)
-
-onMounted(() => {
-  drawBMKGLogo(navLogoCanvas.value)
-})
 
 const statusClass: Record<string, string> = {
   idle: 'bg-slate-500/20 text-slate-300 border-slate-400/30',
@@ -38,10 +31,9 @@ const statusLabel: Record<string, string> = {
     <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-white/10 p-1.5 flex items-center justify-center border border-white/15">
-          <canvas
-            ref="navLogoCanvas"
-            width="80"
-            height="80"
+          <img
+            :src="LOGO_SRC"
+            alt="Logo BMKG"
             class="w-full h-full object-contain"
           />
         </div>

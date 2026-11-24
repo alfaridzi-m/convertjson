@@ -152,9 +152,11 @@ export function parseBanjirRobJSON(raw: unknown): NormalizedByDate {
   const KAB_KEYS = [
     'kabupaten',
     'kabkot',
+    'kabkota',
     'kab_kota',
     'kota',
     'nama_kabkot',
+    'nama_kabkota',
     'nama_kabupaten',
     'nama_kota',
     'kab',
